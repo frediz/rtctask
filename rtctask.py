@@ -2,7 +2,6 @@
 # frediz@linux.vnet.ibm.com
 
 import requests
-requests.packages.urllib3.disable_warnings()
 import json
 import pprint
 import re
@@ -12,6 +11,8 @@ import getpass
 import argparse
 import tempfile, subprocess
 import ConfigParser
+import warnings
+from requests.packages.urllib3 import exceptions
 
 ## color stuff
 class cl:
@@ -71,7 +72,9 @@ class RTCClient(object):
         self.category='_LqSO0L0qEeSLGNNvkdKuNQ'
 
     def sget(self, url, **kwargs):
-        return self.session.get(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", exceptions.InsecureRequestWarning)
+            return self.session.get(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
 
     def spost(self, url, **kwargs):
         return self.session.post(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
@@ -190,6 +193,8 @@ def color_state(state):
         return cl.fg.lightgrey
     elif state == Task.DONE:
         return cl.fg.green
+    else:
+	return cl.fg.cyan
 
 def task_fromquery(client, pattern):
     query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
