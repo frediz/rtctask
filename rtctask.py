@@ -2,7 +2,6 @@
 # frediz@linux.vnet.ibm.com
 
 import requests
-requests.packages.urllib3.disable_warnings()
 import json
 import pprint
 import re
@@ -12,6 +11,8 @@ import getpass
 import argparse
 import tempfile, subprocess
 import ConfigParser
+import warnings
+from requests.packages.urllib3 import exceptions
 
 ## color stuff
 class cl:
@@ -71,7 +72,9 @@ class RTCClient(object):
         self.category='_LqSO0L0qEeSLGNNvkdKuNQ'
 
     def sget(self, url, **kwargs):
-        return self.session.get(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", exceptions.InsecureRequestWarning)
+            return self.session.get(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
 
     def spost(self, url, **kwargs):
         return self.session.post(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
@@ -92,6 +95,9 @@ class Task():
     INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/2'}
     DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'}
     INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'}
+    STORY = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.defined'}
+    EPIC1 = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s1'}
+    EPIC2 = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s2'}
 
     def __init__(self, jclient, taskid = None):
         self.jclient = jclient
@@ -190,6 +196,14 @@ def color_state(state):
         return cl.fg.lightgrey
     elif state == Task.DONE:
         return cl.fg.green
+    elif state == Task.EPIC1:
+	return cl.fg.red
+    elif state == Task.EPIC2:
+	return cl.fg.lightred
+    elif state == Task.STORY:
+	return cl.fg.orange
+    else:
+	return cl.fg.cyan
 
 def task_fromquery(client, pattern):
     query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
