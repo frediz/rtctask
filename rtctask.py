@@ -133,9 +133,10 @@ class Task():
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
         if r['rtc_cm:state'] == Task.INVALID:
             r['rtc_cm:state'] = Task.NEW
+            return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.taskid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.reopen', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
         elif r['rtc_cm:state'] == Task.DONE:
             r['rtc_cm:state'] = Task.INPROGRESS
-        return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.taskid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.reopen', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
+            return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.taskid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.a1', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def invalidate(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
