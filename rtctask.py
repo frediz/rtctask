@@ -95,6 +95,9 @@ class Task():
     INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/2'}
     DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'}
     INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'}
+    STORY = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.defined'}
+    EPIC1 = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s1'}
+    EPIC2 = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s2'}
 
     def __init__(self, jclient, taskid = None):
         self.jclient = jclient
@@ -193,6 +196,12 @@ def color_state(state):
         return cl.fg.lightgrey
     elif state == Task.DONE:
         return cl.fg.green
+    elif state == Task.EPIC1:
+	return cl.fg.red
+    elif state == Task.EPIC2:
+	return cl.fg.lightred
+    elif state == Task.STORY:
+	return cl.fg.orange
     else:
 	return cl.fg.cyan
 
