@@ -11,6 +11,7 @@ import html2text
 import getpass
 import argparse
 import tempfile, subprocess
+import ConfigParser
 
 ## color stuff
 class cl:
@@ -254,8 +255,26 @@ def task_set_owner(client, taskid, owner):
     return task.change(js)
 
 def main():
+    conffile = os.environ.get('HOME')+'/.rtctaskrc'
+    conf = ConfigParser.RawConfigParser(allow_no_value=True)
+    try:
+        with open(conffile) as f:
+            conf.readfp(f)
+    except IOError:
+        sample = """[auth]
+# Specify your rtc id and password (yes in clear..)
+id =
+password =
+"""
+        with open(conffile, "w") as f:
+            f.write (sample)
+            f.close()
+        os.chmod(conffile, 0600)
+        print "Config file sample written to "+conffile
+    conf.read(conffile)
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--id", help="username id for login")
+    parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'))
     parser.add_argument("-s", "--search", help="search pattern", action="store_true")
     parser.add_argument("-c", "--comment", help="additionnal comment")
     parser.add_argument("-e", "--edit", help="edit some field of a task", action="store_true")
@@ -272,10 +291,13 @@ def main():
     args = parser.parse_args()
 
     if args.id:
-        pw = getpass.getpass()
+        pw = conf.get('auth', 'password')
+        if not pw:
+            print "Id      : "+args.id
+            pw = getpass.getpass()
         client = RTCClient(args.id, pw)
     else:
-        print "Please provide --id to specify a userid to use"
+        print "Please provide id on command line with --id or in  "+conffile
         sys.exit(1)
 
     if args.search:
