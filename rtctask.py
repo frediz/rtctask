@@ -160,6 +160,18 @@ def user_search(client, pattern):
     r = client.sget('oslc/users.json?oslc_cm.query=dc:title="*'+pattern+'*"')
     return json.loads(r.text)
 
+def query_search(client, pattern):
+    r = client.sget('oslc/queries.json?oslc_cm.query=rtc_cm:projectArea="'+RTCClient.PROJECT+'" and dc:creator="{currentUser}" and dc:title="*'+pattern+'*"')
+    return json.loads(r.text)
+
+def print_queries(client, pattern):
+    print
+    print "Queries matching : "+cl.fg.blue+pattern+cl.reset
+    print " Created                 | Name                             | Description"
+    print "===================================================================================="
+    for u in query_search(client, pattern)['oslc_cm:results']:
+        print u['dc:modified'] + " | " + cl.fg.green+u['dc:title'].ljust(32)+cl.reset +" | "+u['dc:description']
+
 def print_users(client, pattern):
     print
     print "Users matching : "+cl.fg.blue+pattern+cl.reset
@@ -178,8 +190,17 @@ def color_state(state):
     elif state == Task.DONE:
         return cl.fg.green
 
+def task_fromquery(client, pattern):
+    query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
+    r = client.sget('oslc/queries/'+query+'/rtc_cm:results.json')
+    tasks = json.loads(r.text)
+    print "  ID  | Title"
+    print "=================================================================="
+    for t in tasks:
+        print color_state(t['rtc_cm:state'])+str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
+
 def task_ownedbyme(client):
-    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm%3AownedBy%3D%22{currentUser}%22')
+    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
     tasks = json.loads(r.text)
     print "  ID  | Title"
     print "=================================================================="
@@ -187,7 +208,7 @@ def task_ownedbyme(client):
         print color_state(t['rtc_cm:state'])+str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
 
 def task_search(client, pattern):
-    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm%3AsearchTerms%3D%22'+pattern+'%22')
+    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
     tasks = json.loads(r.text)
     print
     print "Tasks matching : "+cl.fg.blue+pattern+cl.reset
@@ -197,7 +218,7 @@ def task_search(client, pattern):
         print color_state(t['rtc_cm:state'])+str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
 
 def task_bytag(client, tag):
-    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm%3AsearchTerms%3D%22'+tag+'%22')
+    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
     tasks = json.loads(r.text)
     print
     print "Tasks matching : "+cl.fg.blue+tag+cl.reset
@@ -282,6 +303,8 @@ password =
     parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
     parser.add_argument("-d", "--desc", help="description of the new task", default='')
     parser.add_argument("-u", "--user", help="search users for this pattern")
+    parser.add_argument("--findquery", help="search queries for this pattern")
+    parser.add_argument("-q", "--query", help="run query matching this pattern")
     parser.add_argument("--startworking", help="Change state of task to : In Progress", action="store_true")
     parser.add_argument("--stopworking", help="Change state of task to : New", action="store_true")
     parser.add_argument("--reopen", help="Change state of task to : In Progress", action="store_true")
@@ -303,6 +326,10 @@ password =
     if args.search:
         for s in args.params:
             task_search(client, s)
+    elif args.findquery:
+        print_queries(client, args.findquery)
+    elif args.query:
+        task_fromquery(client, args.query)
     elif args.user:
         print_users(client, args.user)
     elif args.owner:
