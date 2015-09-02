@@ -287,6 +287,8 @@ def main():
 # Specify your rtc id and password (yes in clear..)
 id =
 password =
+[query]
+default =
 """
         with open(conffile, "w") as f:
             f.write (sample)
@@ -360,7 +362,11 @@ password =
         for t in args.params:
             task_comment(client, t, args.comment)
     elif len(args.params) == 0:
-        task_ownedbyme(client)
+        query = conf.get('query', 'default')
+        if query:
+            task_fromquery(client, query)
+        else:
+            task_ownedbyme(client)
     else: # there are some parameters provided without options
         for t in args.params:
             task_details(client, t)
