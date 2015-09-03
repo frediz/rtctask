@@ -195,21 +195,26 @@ def query_search(client, pattern):
     r = client.sget('oslc/queries.json?oslc_cm.query=rtc_cm:projectArea="'+RTCClient.PROJECT+'" and dc:creator="{currentUser}" and dc:title="*'+pattern+'*"')
     return json.loads(r.text)
 
-def print_queries(client, pattern):
+def colorize_str(string, color, colorize):
+    if colorize:
+        return color+string+cl.reset
+    return string
+
+def print_queries(client, pattern, colorize):
     print
-    print "Queries matching : "+cl.fg.blue+pattern+cl.reset
+    print "Queries matching : "+colorize_str(pattern, cl.fg.blue, colorize)
     print " Created                 | Name                             | Description"
     print "===================================================================================="
     for u in query_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + cl.fg.green+u['dc:title'].ljust(32)+cl.reset +" | "+u['dc:description']
+        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green, colorize) +" | "+u['dc:description']
 
-def print_users(client, pattern):
+def print_users(client, pattern, colorize):
     print
-    print "Users matching : "+cl.fg.blue+pattern+cl.reset
+    print "Users matching : "+colorize_str(pattern, cl.fg.blue, colorize)
     print " Created                 | Name                             | Email"
     print "===================================================================================="
     for u in user_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + cl.fg.green+u['dc:title'].ljust(32)+cl.reset +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
+        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green, colorize) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
 
 
 def workitem_fromquery(client, pattern):
@@ -271,7 +276,7 @@ def workitem_details(client, workitemid):
     print "Comments :"
     i = 0
     for c in comments:
-        print str(i) + ": " +cl.fg.green+ c['dc:creator']['dc:title']+cl.reset+" ("+c['dc:created'] + ") :"
+        print str(i) + ": " +colorize_str(c['dc:creator']['dc:title'], cl.fg.green, colorize)+" ("+c['dc:created'] + ") :"
         print html2text.html2text(c['dc:description'])
         i = i + 1
 
@@ -303,6 +308,7 @@ def workitem_set_owner(client, workitemid, owner):
     return workitem.change(js)
 
 def main():
+    colorize = 1;
     conffile = os.environ.get('HOME')+'/.rtctaskrc'
     conf = ConfigParser.RawConfigParser(allow_no_value=True)
     try:
@@ -325,6 +331,7 @@ default =
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'))
+    parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
     parser.add_argument("-s", "--search", help="search pattern", action="store_true")
     parser.add_argument("-c", "--comment", help="additionnal comment")
     parser.add_argument("-e", "--edit", help="edit some field of a workitem", action="store_true")
@@ -352,15 +359,18 @@ default =
         print "Please provide id on command line with --id or in  "+conffile
         sys.exit(1)
 
+    if args.nocolor:
+        colorize = 0
+
     if args.search:
         for s in args.params:
             workitem_search(client, s)
     elif args.findquery:
-        print_queries(client, args.findquery)
+        print_queries(client, args.findquery, colorize)
     elif args.query:
         workitem_fromquery(client, args.query)
     elif args.user:
-        print_users(client, args.user)
+        print_users(client, args.user, colorize)
     elif args.owner:
         for s in args.params:
             workitem_set_owner(client, s, args.owner)
