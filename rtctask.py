@@ -165,21 +165,26 @@ def query_search(client, pattern):
     r = client.sget('oslc/queries.json?oslc_cm.query=rtc_cm:projectArea="'+RTCClient.PROJECT+'" and dc:creator="{currentUser}" and dc:title="*'+pattern+'*"')
     return json.loads(r.text)
 
-def print_queries(client, pattern):
+def colorize_str(string, color, colorize):
+    if colorize:
+        return color+string+cl.reset
+    return string
+
+def print_queries(client, pattern, colorize):
     print
-    print "Queries matching : "+cl.fg.blue+pattern+cl.reset
+    print "Queries matching : "+colorize_str(pattern, cl.fg.blue, colorize)
     print " Created                 | Name                             | Description"
     print "===================================================================================="
     for u in query_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + cl.fg.green+u['dc:title'].ljust(32)+cl.reset +" | "+u['dc:description']
+        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green, colorize) +" | "+u['dc:description']
 
-def print_users(client, pattern):
+def print_users(client, pattern, colorize):
     print
-    print "Users matching : "+cl.fg.blue+pattern+cl.reset
+    print "Users matching : "+colorize_str(pattern, cl.fg.blue, colorize)
     print " Created                 | Name                             | Email"
     print "===================================================================================="
     for u in user_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + cl.fg.green+u['dc:title'].ljust(32)+cl.reset +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
+        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green, colorize) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
 
 def color_state(state):
     if state == Task.NEW:
@@ -191,32 +196,32 @@ def color_state(state):
     elif state == Task.DONE:
         return cl.fg.green
 
-def task_fromquery(client, pattern):
+def task_fromquery(client, pattern, colorize):
     query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
     r = client.sget('oslc/queries/'+query+'/rtc_cm:results.json')
     tasks = json.loads(r.text)
     print "  ID  | Title"
     print "=================================================================="
     for t in tasks:
-        print color_state(t['rtc_cm:state'])+str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
+        print colorize_str(str(t['dc:identifier']), color_state(t['rtc_cm:state']), colorize) + " | " + t['dc:title']
 
-def task_ownedbyme(client):
+def task_ownedbyme(client, colorize):
     r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
     tasks = json.loads(r.text)
     print "  ID  | Title"
     print "=================================================================="
     for t in tasks['oslc_cm:results']:
-        print color_state(t['rtc_cm:state'])+str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
+        print colorize_str(str(t['dc:identifier']) , color_state(t['rtc_cm:state']), colorize) + " | " + t['dc:title']
 
-def task_search(client, pattern):
+def task_search(client, pattern, colorize):
     r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
     tasks = json.loads(r.text)
     print
-    print "Tasks matching : "+cl.fg.blue+pattern+cl.reset
+    print "Tasks matching : "+colorize_str(pattern, cl.fg.blue, colorize)
     print "  ID  | Title"
     print "=================================================================="
     for t in tasks['oslc_cm:results']:
-        print color_state(t['rtc_cm:state'])+str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
+        print colorize_str(str(t['dc:identifier']), color_state(t['rtc_cm:state']), colorize) + " | " + t['dc:title']
 
 def task_bytag(client, tag):
     r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
@@ -228,15 +233,15 @@ def task_bytag(client, tag):
     for t in tasks['oslc_cm:results']:
         print color_state(t['rtc_cm:state']) + str(t['dc:identifier'])+cl.reset + " | " + t['dc:title']
 
-def task_details(client, taskid):
+def task_details(client, taskid, colorize):
     task = Task(client, taskid)
     js = task.get_json('?oslc_cm.properties=dc:identifier,dc:title,rdf:resource,dc:creator{dc:title},rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title}')
     print
     print "=================================================================="
-    print "Task ID : " +cl.fg.green+str(js['dc:identifier'])+cl.reset
-    print "Title   : " +cl.fg.red+ js['dc:title']+cl.reset
+    print "Task ID : " +colorize_str(str(js['dc:identifier']), cl.fg.green, colorize)
+    print "Title   : " +colorize_str(js['dc:title'], cl.fg.red, colorize)
     print "URL     : " +js['rdf:resource']
-    print "State   : " +color_state({ u'rdf:resource': js['rtc_cm:state']['rdf:resource']}) + js['rtc_cm:state']['dc:title'] + cl.reset
+    print "State   : " +colorize_str(js['rtc_cm:state']['dc:title'], color_state({ u'rdf:resource': js['rtc_cm:state']['rdf:resource']}), colorize)
     print "Creator : " +js['dc:creator']['dc:title']
     print "Owner   : " +js['rtc_cm:ownedBy']['dc:title']
     print "Description:"
@@ -245,7 +250,7 @@ def task_details(client, taskid):
     print "Comments :"
     i = 0
     for c in comments:
-        print str(i) + ": " +cl.fg.green+ c['dc:creator']['dc:title']+cl.reset+" ("+c['dc:created'] + ") :"
+        print str(i) + ": " +colorize_str(c['dc:creator']['dc:title'], cl.fg.green, colorize)+" ("+c['dc:created'] + ") :"
         print html2text.html2text(c['dc:description'])
         i = i + 1
 
@@ -277,6 +282,7 @@ def task_set_owner(client, taskid, owner):
     return task.change(js)
 
 def main():
+    colorize = 1;
     conffile = os.environ.get('HOME')+'/.rtctaskrc'
     conf = ConfigParser.RawConfigParser(allow_no_value=True)
     try:
@@ -299,6 +305,7 @@ default =
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'))
+    parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
     parser.add_argument("-s", "--search", help="search pattern", action="store_true")
     parser.add_argument("-c", "--comment", help="additionnal comment")
     parser.add_argument("-e", "--edit", help="edit some field of a task", action="store_true")
@@ -326,15 +333,18 @@ default =
         print "Please provide id on command line with --id or in  "+conffile
         sys.exit(1)
 
+    if args.nocolor:
+        colorize = 0
+
     if args.search:
         for s in args.params:
-            task_search(client, s)
+            task_search(client, s, colorize)
     elif args.findquery:
-        print_queries(client, args.findquery)
+        print_queries(client, args.findquery, colorize)
     elif args.query:
-        task_fromquery(client, args.query)
+        task_fromquery(client, args.query, colorize)
     elif args.user:
-        print_users(client, args.user)
+        print_users(client, args.user, colorize)
     elif args.owner:
         for s in args.params:
             task_set_owner(client, s, args.owner)
@@ -364,12 +374,12 @@ default =
     elif len(args.params) == 0:
         query = conf.get('query', 'default')
         if query:
-            task_fromquery(client, query)
+            task_fromquery(client, query, colorize)
         else:
-            task_ownedbyme(client)
+            task_ownedbyme(client, colorize)
     else: # there are some parameters provided without options
         for t in args.params:
-            task_details(client, t)
+            task_details(client, t, colorize)
 
     sys.exit(0)
 
