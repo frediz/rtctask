@@ -216,10 +216,11 @@ def workitem_fromquery(client, pattern):
     query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
     r = client.sget('oslc/queries/'+query+'/rtc_cm:results.json')
     workitems = json.loads(r.text)
-    print "  ID  | Title"
-    print "=================================================================="
+    maxlen = max([len(w['dc:title']) for w in workitems])
+    print "  ID  | "+"Title".ljust(maxlen, ' ') +" | Modified"
+    print "========"+"".ljust(maxlen, '=')+"======================"
     for w in workitems:
-        print Workitem.getStateColor(w['rtc_cm:state'])+str(w['dc:identifier'])+cl.reset + " | "+w['dc:title']
+        print Workitem.getStateColor(w['rtc_cm:state'])+str(w['dc:identifier'])+cl.reset +" | "+w['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w['dc:modified'])
 
 def workitem_ownedbyme(client):
     r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
