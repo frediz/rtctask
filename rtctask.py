@@ -2,7 +2,7 @@
 # frediz@linux.vnet.ibm.com
 
 import requests
-requests.packages.urllib3.disable_warnings()
+import warnings
 import json
 import pprint
 import re
@@ -71,7 +71,9 @@ class RTCClient(object):
         self.category='_LqSO0L0qEeSLGNNvkdKuNQ'
 
     def sget(self, url, **kwargs):
-        return self.session.get(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", requests.packages.urllib3.exceptions.InsecureRequestWarning)
+            return self.session.get(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
 
     def spost(self, url, **kwargs):
         return self.session.post(RTCClient.HOST + url, allow_redirects=True, verify=False, **kwargs)
