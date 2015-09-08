@@ -13,9 +13,10 @@ $ pip install requests
 
 ## ID file
 
-Here is an example of the ~/.rtctask file to start with:
+Here is an example of the ~/.rtctaskrc file to start with:
 
 ```
+[auth]
 id = user@cc.ibm.com
 password = mypasswordincleartext
 [query]
