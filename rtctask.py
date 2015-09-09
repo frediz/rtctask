@@ -25,6 +25,7 @@ class cl:
     and invisible work with the main class
     i.e. colors.bold
     """
+    colorize = 1
     reset='\033[0m'
     bold='\033[01m'
     disable='\033[02m'
@@ -267,6 +268,11 @@ class Defect(Workitem):
             return cl.fg.green
 
 # Misc functions to do option's work
+def colorize_str(string, color):
+    if cl.colorize:
+        return color+string+cl.reset
+    return string
+
 def user_search(client, pattern):
     r = client.sget('oslc/users.json?oslc_cm.query=dc:title="*'+pattern+'*"')
     return json.loads(r.text)
@@ -275,26 +281,21 @@ def query_search(client, pattern):
     r = client.sget('oslc/queries.json?oslc_cm.query=rtc_cm:projectArea="'+RTCClient.PROJECT+'" and dc:creator="{currentUser}" and dc:title="*'+pattern+'*"')
     return json.loads(r.text)
 
-def colorize_str(string, color, colorize):
-    if colorize:
-        return color+string+cl.reset
-    return string
-
-def print_queries(client, pattern, colorize):
+def print_queries(client, pattern):
     print
-    print "Queries matching : "+colorize_str(pattern, cl.fg.blue, colorize)
+    print "Queries matching : "+colorize_str(pattern, cl.fg.blue)
     print " Created                 | Name                             | Description"
     print "===================================================================================="
     for u in query_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green, colorize) +" | "+u['dc:description']
+        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green) +" | "+u['dc:description']
 
-def print_users(client, pattern, colorize):
+def print_users(client, pattern):
     print
-    print "Users matching : "+colorize_str(pattern, cl.fg.blue, colorize)
+    print "Users matching : "+colorize_str(pattern, cl.fg.blue)
     print " Created                 | Name                             | Email"
     print "===================================================================================="
     for u in user_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green, colorize) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
+        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
 
 
 def workitem_fromquery(client, pattern):
@@ -304,41 +305,41 @@ def workitem_fromquery(client, pattern):
     print "  ID  | "+"Title".ljust(maxlen, ' ') +" | Modified"
     print "========"+"".ljust(maxlen, '=')+"======================"
     for w in workitems:
-        print w.getStateColor(w.js['rtc_cm:state'])+str(w.js['dc:identifier'])+cl.reset +" | "+w.js['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
+        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) +" | "+w.js['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
 
 def workitem_ownedbyme(client):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
     print "  ID  | Title"
     print "=================================================================="
     for w in workitems:
-        print w.getStateColor(w.js['rtc_cm:state'])+str(w.js['dc:identifier'])+cl.reset + " | " + w.js['dc:title']
+        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) + " | " + w.js['dc:title']
 
 def workitem_search(client, pattern):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
     print
-    print "Workitems matching : "+cl.fg.blue+pattern+cl.reset
+    print "Workitems matching : "+colorize_str(pattern, cl.fg.blue)
     print "  ID  | Title"
     print "=================================================================="
     for w in workitems:
-        print w.getStateColor(w.js['rtc_cm:state'])+str(w.js['dc:identifier'])+cl.reset + " | " + w.js['dc:title']
+        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) + " | " + w.js['dc:title']
 
 def workitem_bytag(client, tag):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
     print
-    print "workitems matching : "+cl.fg.blue+tag+cl.reset
+    print "workitems matching : "+colorize_str(tag, cl.fg.blue)
     print "  ID  | Title"
     print "=================================================================="
     for w in workitems:
-        print w.getStateColor(w.js['rtc_cm:state']) + str(w.js['dc:identifier'])+cl.reset + " | " + w.js['dc:title']
+        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) + " | " + w.js['dc:title']
 
 def workitem_details(client, workitemid):
     wi = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title}')
     print
     print "=================================================================="
-    print "Workitem ID : " +cl.fg.green+str(wi.js['dc:identifier'])+cl.reset+' ('+wi.js['dc:type']['dc:title']+')'
-    print "Title       : " +cl.fg.red+ wi.js['dc:title']+cl.reset
+    print "Workitem ID : " +colorize_str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
+    print "Title       : " +colorize_str(wi.js['dc:title'], cl.fg.red)
     print "URL         : " +wi.js['rdf:resource']
-    print "State       : " +wi.getStateColor({ u'rdf:resource': wi.js['rtc_cm:state']['rdf:resource']}) + wi.js['rtc_cm:state']['dc:title'] + cl.reset
+    print "State       : " +colorize_str(wi.js['rtc_cm:state']['dc:title'], wi.getStateColor({ u'rdf:resource': wi.js['rtc_cm:state']['rdf:resource']}))
     print "Creator     : " +wi.js['dc:creator']['dc:title']
     print "Owner       : " +wi.js['rtc_cm:ownedBy']['dc:title']
     print "Description :"
@@ -349,7 +350,7 @@ def workitem_details(client, workitemid):
     print "Comments :"
     i = 0
     for c in comments:
-        print str(i) + ": " +colorize_str(c['dc:creator']['dc:title'], cl.fg.green, colorize)+" ("+c['dc:created'] + ") :"
+        print str(i) + ": " +colorize_str(c['dc:creator']['dc:title'], cl.fg.green)+" ("+c['dc:created'] + ") :"
         print html2text.html2text(c['dc:description'])
         i = i + 1
 
@@ -379,7 +380,6 @@ def workitem_set_owner(client, workitemid, owner):
     return workitem.change(js)
 
 def main():
-    colorize = 1;
     conffile = os.environ.get('HOME')+'/.rtctaskrc'
     conf = ConfigParser.RawConfigParser(allow_no_value=True)
     try:
@@ -431,17 +431,17 @@ default =
         sys.exit(1)
 
     if args.nocolor:
-        colorize = 0
+        cl.colorize = 0
 
     if args.search:
         for s in args.params:
             workitem_search(client, s)
     elif args.findquery:
-        print_queries(client, args.findquery, colorize)
+        print_queries(client, args.findquery)
     elif args.query:
         workitem_fromquery(client, args.query)
     elif args.user:
-        print_users(client, args.user, colorize)
+        print_users(client, args.user)
     elif args.owner:
         for s in args.params:
             workitem_set_owner(client, s, args.owner)
