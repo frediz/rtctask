@@ -68,6 +68,11 @@ class RTCClient(object):
         self.password = password
         self.session = requests.Session()
         r = self.get_authed_session()
+        try:
+            json.loads(r.text)
+        except:
+            print "Authentication failed."
+            sys.exit(1)
         self.category='_LqSO0L0qEeSLGNNvkdKuNQ'
 
     def sget(self, url, **kwargs):
