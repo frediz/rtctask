@@ -114,8 +114,12 @@ class Workitem():
             {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'},
             {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s3'},
             {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.verified'},
+            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/3'},
             ]
         INVALID = [ {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'},
+            ]
+        TESTED = [
+            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.tested'},
             ]
 
     @classmethod
@@ -126,6 +130,8 @@ class Workitem():
             return cl.fg.lightred
         elif state in Workitem.Status.INVALID:
             return cl.fg.lightgrey
+        elif state in Workitem.Status.TESTED:
+            return cl.fg.lightgreen
         elif state in Workitem.Status.DONE:
             return cl.fg.green
 
