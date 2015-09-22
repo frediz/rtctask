@@ -94,55 +94,46 @@ class RTCClient(object):
         return self.spost('j_security_check', data={'j_username':self.user,'j_password':self.password})
 
 
-class Workitem():
-    class Type:
-        TASK  = {u'rdf:resource': RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/task'}
-        STORY = {u'rdf:resource': RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.story'}
-        EPIC  = {u'rdf:resource': RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.epic'}
-    class Status:
-        NEW = [
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/1'},
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s1'},
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.idea'},
-            ]
-        INPROGRESS = [
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/2'},
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s2'},
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.defined'},
-            ]
-        DONE = [
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'},
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s3'},
-            {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.verified'},
-            ]
-        INVALID = [ {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'},
-            ]
+class Workitem(object):
+    def getStateColor(self, state):
+        #should be implemented else :
+        return cl.reverse
 
     @classmethod
-    def getStateColor(cls, state):
-        if state in Workitem.Status.NEW:
-            return cl.fg.purple
-        elif state in Workitem.Status.INPROGRESS:
-            return cl.fg.lightred
-        elif state in Workitem.Status.INVALID:
-            return cl.fg.lightgrey
-        elif state in Workitem.Status.DONE:
-            return cl.fg.green
+    def __createItem(c, client, json):
+        for cls in Workitem.__subclasses__():
+            if json['dc:type']['rdf:resource'] == cls.TYPE:
+                return cls(client, json['dc:identifier'], json)
+        raise ValueError
 
-    def __init__(self, jclient, workitemid = None):
-        self.jclient = jclient
-        self.workitemid = workitemid
+    @classmethod
+    def getOne(cls, client, workitemid, json_query = ""):
+        r = client.sget('oslc/workitems/'+ str(workitemid) +'.json'+json_query)
+        return Workitem.__createItem(client, json.loads(r.text))
 
-    def create(self, title, description, witype, owner = None):
+    @classmethod
+    def getList(cls, client, json_query = ""):
+        r = client.sget(json_query)
+        workitems = json.loads(r.text)['oslc_cm:results']
+        return map(lambda x: Workitem.__createItem(client, x), workitems)
+
+    @classmethod
+    def createOne(cls, client, title, description, witype, owner = None):
         js = {
                 'dc:description': description,
                 'dc:title': title,
-                'dc:type': witype,
-                'rtc_cm:filedAgainst': { 'rdf:resource': RTCClient.HOST + 'resource/itemOid/com.ibm.team.workitem.Category/%s'%(self.jclient.category) },
+                'dc:type': { 'rdf:resource': witype },
+                'rtc_cm:filedAgainst': { 'rdf:resource': RTCClient.HOST + 'resource/itemOid/com.ibm.team.workitem.Category/%s'%(client.category) },
              }
         if owner is not None:
             js['rtc_cm:ownedBy'] = owner
-        return self.jclient.spost('oslc/contexts/'+ RTCClient.PROJECT+'/workitems', json=js, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'});
+        r = client.spost('oslc/contexts/'+ RTCClient.PROJECT+'/workitems', json=js, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'});
+        return Workitem.__createItem(client, json.loads(r.text))
+
+    def __init__(self, jclient, workitemid = None, json = {}):
+        self.jclient = jclient
+        self.workitemid = workitemid
+        self.js = json
 
     def get_comments(self):
         r = self.jclient.sget('oslc/workitems/'+ str(self.workitemid) +'/rtc_cm:comments.json?oslc_cm.properties=dc:created,dc:description,dc:creator{dc:title}')
@@ -156,31 +147,31 @@ class Workitem():
 
     def startWorking(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = Task.INPROGRESS
+        r['rtc_cm:state'] = self.INPROGRESS
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.startWorking', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def stopWorking(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = Task.NEW
+        r['rtc_cm:state'] = self.NEW
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.stopWorking', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def reopen(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        if r['rtc_cm:state'] == Task.INVALID:
-            r['rtc_cm:state'] = Task.NEW
+        if r['rtc_cm:state'] == self.INVALID:
+            r['rtc_cm:state'] = self.NEW
             return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.reopen', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
-        elif r['rtc_cm:state'] == Task.DONE:
-            r['rtc_cm:state'] = Task.INPROGRESS
+        elif r['rtc_cm:state'] == self.DONE:
+            r['rtc_cm:state'] = self.INPROGRESS
             return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.a1', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def invalidate(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = Task.INVALID
+        r['rtc_cm:state'] = self.INVALID
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.a2', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def resolve(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = Task.DONE
+        r['rtc_cm:state'] = self.DONE
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.resolve', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def get_json(self, args = ""):
@@ -190,6 +181,90 @@ class Workitem():
         r = self.jclient.sget('oslc/workitems/'+ str(self.workitemid) +'.xml'+args)
         return r.text
 
+class Task(Workitem):
+    TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/task'
+
+    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/1'}
+    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/2'}
+    DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'}
+    INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'}
+
+    def getStateColor(self, state):
+        if state == self.NEW:
+            return cl.fg.purple
+        elif state == self.INPROGRESS:
+            return cl.fg.lightred
+        elif state == self.INVALID:
+            return cl.fg.lightgrey
+        elif state == self.DONE:
+            return cl.fg.green
+
+class Story(Workitem):
+    TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.story'
+
+    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.idea'}
+    IMPLEMENTED = { u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.tested'}
+    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.defined'}
+    DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.verified'}
+    INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.storyWorkflow.state.s2'}
+    DEFERRED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.storyWorkflow.state.s1'}
+
+    def getStateColor(self, state):
+        if state == self.NEW:
+            return cl.fg.purple
+        elif state == self.INPROGRESS:
+            return cl.fg.lightred
+        elif state == self.IMPLEMENTED:
+            return cl.fg.lightred
+        elif state == self.INVALID:
+            return cl.fg.lightgrey
+        elif state == self.DONE:
+            return cl.fg.green
+        elif state == self.DEFERRED:
+            return cl.fg.yellow
+
+
+class Epic(Workitem):
+    TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.epic'
+
+    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s1'}
+    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s2'}
+    DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s3'}
+    INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s6'}
+    DEFERRED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s5'}
+
+    def getStateColor(self, state):
+        if state == self.NEW:
+            return cl.fg.purple
+        elif state == self.INPROGRESS:
+            return cl.fg.lightred
+        elif state == self.INVALID:
+            return cl.fg.lightgrey
+        elif state == self.DONE:
+            return cl.fg.green
+        elif state == self.DEFERRED:
+            return cl.fg.yellow
+
+class Defect(Workitem):
+    TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/defect'
+
+    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/1'}
+    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/2'}
+    REOPENED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/6'}
+    RESOLVED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/3'}
+    VERIFIED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/4'}
+
+    def getStateColor(self, state):
+        if state == self.NEW:
+            return cl.fg.purple
+        elif state == self.INPROGRESS:
+            return cl.fg.lightred
+        elif state == self.REOPENED:
+            return cl.fg.cyan
+        elif state == self.RESOLVED:
+            return cl.fg.lightred
+        elif state == self.VERIFIED:
+            return cl.fg.green
 
 # Misc functions to do option's work
 def user_search(client, pattern):
@@ -219,58 +294,51 @@ def print_users(client, pattern):
 
 def workitem_fromquery(client, pattern):
     query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
-    r = client.sget('oslc/queries/'+query+'/rtc_cm:results.json')
-    workitems = json.loads(r.text)
-    maxlen = max([len(w['dc:title']) for w in workitems['oslc_cm:results']])
+    workitems = Workitem.getList(client, 'oslc/queries/'+query+'/rtc_cm:results.json')
+    maxlen = max([len(w.js['dc:title']) for w in workitems])
     print "  ID  | "+"Title".ljust(maxlen, ' ') +" | Modified"
     print "========"+"".ljust(maxlen, '=')+"======================"
-    for w in workitems['oslc_cm:results']:
-        print Workitem.getStateColor(w['rtc_cm:state'])+str(w['dc:identifier'])+cl.reset +" | "+w['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w['dc:modified'])
+    for w in workitems:
+        print w.getStateColor(w.js['rtc_cm:state'])+str(w.js['dc:identifier'])+cl.reset +" | "+w.js['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
 
 def workitem_ownedbyme(client):
-    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
-    workitems = json.loads(r.text)
+    workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
     print "  ID  | Title"
     print "=================================================================="
-    for w in workitems['oslc_cm:results']:
-        print Workitem.getStateColor(w['rtc_cm:state'])+str(w['dc:identifier'])+cl.reset + " | " + w['dc:title']
+    for w in workitems:
+        print w.getStateColor(w.js['rtc_cm:state'])+str(w.js['dc:identifier'])+cl.reset + " | " + w.js['dc:title']
 
 def workitem_search(client, pattern):
-    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
-    workitems = json.loads(r.text)
+    workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
     print
     print "Workitems matching : "+cl.fg.blue+pattern+cl.reset
     print "  ID  | Title"
     print "=================================================================="
-    for w in workitems['oslc_cm:results']:
-        print Workitem.getStateColor(w['rtc_cm:state'])+str(w['dc:identifier'])+cl.reset + " | " + w['dc:title']
+    for w in workitems:
+        print w.getStateColor(w.js['rtc_cm:state'])+str(w.js['dc:identifier'])+cl.reset + " | " + w.js['dc:title']
 
 def workitem_bytag(client, tag):
-    r = client.sget('oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
-    workitems = json.loads(r.text)
+    workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
     print
     print "workitems matching : "+cl.fg.blue+tag+cl.reset
     print "  ID  | Title"
     print "=================================================================="
-    for w in workitems['oslc_cm:results']:
-        print Workitem.getStateColor(w['rtc_cm:state']) + str(w['dc:identifier'])+cl.reset + " | " + w['dc:title']
+    for w in workitems:
+        print w.getStateColor(w.js['rtc_cm:state']) + str(w.js['dc:identifier'])+cl.reset + " | " + w.js['dc:title']
 
 def workitem_details(client, workitemid):
-    workitem = Workitem(client, workitemid)
-    js = workitem.get_json('?oslc_cm.properties=dc:identifier,dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title}')
-    #js = workitem.get_json()
-    #pprint.pprint(js)
+    wi = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title}')
     print
     print "=================================================================="
-    print "Workitem ID : " +cl.fg.green+str(js['dc:identifier'])+cl.reset+' ('+js['dc:type']['dc:title']+')'
-    print "Title       : " +cl.fg.red+ js['dc:title']+cl.reset
-    print "URL         : " +js['rdf:resource']
-    print "State       : " +Workitem.getStateColor({ u'rdf:resource': js['rtc_cm:state']['rdf:resource']}) + js['rtc_cm:state']['dc:title'] + cl.reset
-    print "Creator     : " +js['dc:creator']['dc:title']
-    print "Owner       : " +js['rtc_cm:ownedBy']['dc:title']
+    print "Workitem ID : " +cl.fg.green+str(wi.js['dc:identifier'])+cl.reset+' ('+wi.js['dc:type']['dc:title']+')'
+    print "Title       : " +cl.fg.red+ wi.js['dc:title']+cl.reset
+    print "URL         : " +wi.js['rdf:resource']
+    print "State       : " +wi.getStateColor({ u'rdf:resource': wi.js['rtc_cm:state']['rdf:resource']}) + wi.js['rtc_cm:state']['dc:title'] + cl.reset
+    print "Creator     : " +wi.js['dc:creator']['dc:title']
+    print "Owner       : " +wi.js['rtc_cm:ownedBy']['dc:title']
     print "Description :"
-    print html2text.html2text(js['dc:description'])
-    comments = workitem.get_comments()
+    print html2text.html2text(wi.js['dc:description'])
+    comments = wi.get_comments()
     if len(comments) == 0:
         return
     print "Comments :"
@@ -281,19 +349,17 @@ def workitem_details(client, workitemid):
         i = i + 1
 
 def workitem_comment(client, workitemid, comment):
-    workitem = Workitem(client, workitemid)
+    workitem = Workitem.getOne(client, workitemid)
     return workitem.add_comment(comment)
 
 def workitem_create(client, title, description):
-    workitem = Workitem(client)
-    return workitem.create(title, description, Workitem.Type.TASK)
+    return Workitem.createOne(client, title, description, Task.TYPE)
 
 def workitem_edit(client, workitemid):
-    workitem = Workitem(client, workitemid)
-    js = workitem.get_json('?oslc_cm.properties=dc:identifier,dc:title,dc:description,rtc_cm:ownedBy{dc:title}')
+    workitem = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type,dc:title,dc:description,rtc_cm:ownedBy{dc:title}')
     with tempfile.NamedTemporaryFile(suffix='workitem') as temp:
         editor = os.environ.get('EDITOR','vim')
-        buf = json.dumps(js, indent = 2, separators=(',', ': '))
+        buf = json.dumps(workitem.js, indent = 2, separators=(',', ': '))
         temp.write(buf)
         temp.flush()
         subprocess.call([editor, temp.name])
@@ -302,7 +368,7 @@ def workitem_edit(client, workitemid):
     return workitem.change(js)
 
 def workitem_set_owner(client, workitemid, owner):
-    workitem = Workitem(client, workitemid)
+    workitem = Workitem.getOne(client, workitemid)
     users = user_search(client, owner)
     js = { 'rtc_cm:ownedBy': { 'rdf:resource': users['oslc_cm:results'][0]['rdf:resource'] } }
     return workitem.change(js)
