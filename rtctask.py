@@ -25,7 +25,7 @@ class cl:
     and invisible work with the main class
     i.e. colors.bold
     """
-    colorize = 1
+    colorize = True
     reset='\033[0m'
     bold='\033[01m'
     disable='\033[02m'
@@ -33,6 +33,12 @@ class cl:
     reverse='\033[07m'
     strikethrough='\033[09m'
     invisible='\033[08m'
+    # return colorized string
+    @classmethod
+    def str(cls, string, color):
+        if cl.colorize:
+            return color+string+cl.reset
+        return string
     class fg:
         black='\033[30m'
         red='\033[31m'
@@ -96,9 +102,11 @@ class RTCClient(object):
 
 
 class Workitem(object):
-    def getStateColor(self, state):
+    def getStateColor(self):
         #should be implemented else :
         return cl.reverse
+    def stateColorize(self, string):
+        return cl.str(string, self.getStateColor())
 
     @classmethod
     def __createItem(c, client, json):
@@ -148,31 +156,31 @@ class Workitem(object):
 
     def startWorking(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = self.INPROGRESS
+        r['rtc_cm:state']['rdf:resource'] = self.INPROGRESS
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.startWorking', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def stopWorking(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = self.NEW
+        r['rtc_cm:state']['rdf:resource'] = self.NEW
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.stopWorking', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def reopen(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        if r['rtc_cm:state'] == self.INVALID:
-            r['rtc_cm:state'] = self.NEW
+        if r['rtc_cm:state']['rdf:resource'] == self.INVALID:
+            r['rtc_cm:state']['rdf:resource'] = self.NEW
             return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.reopen', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
-        elif r['rtc_cm:state'] == self.DONE:
-            r['rtc_cm:state'] = self.INPROGRESS
+        elif r['rtc_cm:state']['rdf:resource'] == self.DONE:
+            r['rtc_cm:state']['rdf:resource'] = self.INPROGRESS
             return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.a1', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def invalidate(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = self.INVALID
+        r['rtc_cm:state']['rdf:resource'] = self.INVALID
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.a2', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def resolve(self):
         r = self.get_json('?oslc_cm.properties=rtc_cm:state{rdf:resource}')
-        r['rtc_cm:state'] = self.DONE
+        r['rtc_cm:state']['rdf:resource'] = self.DONE
         return self.jclient.sput('resource/itemName/com.ibm.team.workitem.WorkItem/'+ str(self.workitemid)+'?_action=com.ibm.team.workitem.taskWorkflow.action.resolve', json=r, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def get_json(self, args = ""):
@@ -185,12 +193,13 @@ class Workitem(object):
 class Task(Workitem):
     TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/task'
 
-    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/1'}
-    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/2'}
-    DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'}
-    INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'}
+    NEW = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/1'
+    INPROGRESS = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/2'
+    DONE = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/3'
+    INVALID = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s4'
 
-    def getStateColor(self, state):
+    def getStateColor(self):
+        state = self.js['rtc_cm:state']['rdf:resource']
         if state == self.NEW:
             return cl.fg.purple
         elif state == self.INPROGRESS:
@@ -203,14 +212,15 @@ class Task(Workitem):
 class Story(Workitem):
     TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.story'
 
-    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.idea'}
-    IMPLEMENTED = { u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.tested'}
-    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.defined'}
-    DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.verified'}
-    INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.storyWorkflow.state.s2'}
-    DEFERRED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.storyWorkflow.state.s1'}
+    NEW = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.idea'
+    IMPLEMENTED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.tested'
+    INPROGRESS = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.defined'
+    DONE = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.story.verified'
+    INVALID = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.storyWorkflow.state.s2'
+    DEFERRED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.storyWorkflow/com.ibm.team.apt.storyWorkflow.state.s1'
 
-    def getStateColor(self, state):
+    def getStateColor(self):
+        state = self.js['rtc_cm:state']['rdf:resource']
         if state == self.NEW:
             return cl.fg.purple
         elif state == self.INPROGRESS:
@@ -228,13 +238,14 @@ class Story(Workitem):
 class Epic(Workitem):
     TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.epic'
 
-    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s1'}
-    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s2'}
-    DONE = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s3'}
-    INVALID = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s6'}
-    DEFERRED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s5'}
+    NEW = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s1'
+    INPROGRESS = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s2'
+    DONE = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s3'
+    INVALID = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s6'
+    DEFERRED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.apt.epic.workflow/com.ibm.team.apt.epic.workflow.state.s5'
 
-    def getStateColor(self, state):
+    def getStateColor(self):
+        state = self.js['rtc_cm:state']['rdf:resource']
         if state == self.NEW:
             return cl.fg.purple
         elif state == self.INPROGRESS:
@@ -249,13 +260,14 @@ class Epic(Workitem):
 class Defect(Workitem):
     TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/defect'
 
-    NEW = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/1'}
-    INPROGRESS = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/2'}
-    REOPENED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/6'}
-    RESOLVED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/3'}
-    VERIFIED = {u'rdf:resource': RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/4'}
+    NEW = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/1'
+    INPROGRESS = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/2'
+    REOPENED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/6'
+    RESOLVED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/3'
+    VERIFIED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/com.ibm.team.workitem.defectWorkflow/4'
 
-    def getStateColor(self, state):
+    def getStateColor(self):
+        state = self.js['rtc_cm:state']['rdf:resource']
         if state == self.NEW:
             return cl.fg.purple
         elif state == self.INPROGRESS:
@@ -267,11 +279,6 @@ class Defect(Workitem):
         elif state == self.VERIFIED:
             return cl.fg.green
 
-# Misc functions to do option's work
-def colorize_str(string, color):
-    if cl.colorize:
-        return color+string+cl.reset
-    return string
 
 def user_search(client, pattern):
     r = client.sget('oslc/users.json?oslc_cm.query=dc:title="*'+pattern+'*"')
@@ -283,19 +290,19 @@ def query_search(client, pattern):
 
 def print_queries(client, pattern):
     print
-    print "Queries matching : "+colorize_str(pattern, cl.fg.blue)
+    print "Queries matching : "+cl.str(pattern, cl.fg.blue)
     print " Created                 | Name                             | Description"
     print "===================================================================================="
     for u in query_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green) +" | "+u['dc:description']
+        print u['dc:modified'] + " | " + cl.str(u['dc:title'].ljust(32), cl.fg.green) +" | "+u['dc:description']
 
 def print_users(client, pattern):
     print
-    print "Users matching : "+colorize_str(pattern, cl.fg.blue)
+    print "Users matching : "+cl.str(pattern, cl.fg.blue)
     print " Created                 | Name                             | Email"
     print "===================================================================================="
     for u in user_search(client, pattern)['oslc_cm:results']:
-        print u['dc:modified'] + " | " + colorize_str(u['dc:title'].ljust(32), cl.fg.green) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
+        print u['dc:modified'] + " | " + cl.str(u['dc:title'].ljust(32), cl.fg.green) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
 
 
 def workitem_fromquery(client, pattern):
@@ -305,41 +312,41 @@ def workitem_fromquery(client, pattern):
     print "  ID  | "+"Title".ljust(maxlen, ' ') +" | Modified"
     print "========"+"".ljust(maxlen, '=')+"======================"
     for w in workitems:
-        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) +" | "+w.js['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
+        print w.stateColorize(str(w.js['dc:identifier'])) +" | "+w.js['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
 
 def workitem_ownedbyme(client):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
     print "  ID  | Title"
     print "=================================================================="
     for w in workitems:
-        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) + " | " + w.js['dc:title']
+        print w.stateColorize(str(w.js['dc:identifier'])) + " | " + w.js['dc:title']
 
 def workitem_search(client, pattern):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
     print
-    print "Workitems matching : "+colorize_str(pattern, cl.fg.blue)
+    print "Workitems matching : "+cl.str(pattern, cl.fg.blue)
     print "  ID  | Title"
     print "=================================================================="
     for w in workitems:
-        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) + " | " + w.js['dc:title']
+        print w.stateColorize(str(w.js['dc:identifier'])) + " | " + w.js['dc:title']
 
 def workitem_bytag(client, tag):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
     print
-    print "workitems matching : "+colorize_str(tag, cl.fg.blue)
+    print "workitems matching : "+cl.str(tag, cl.fg.blue)
     print "  ID  | Title"
     print "=================================================================="
     for w in workitems:
-        print colorize_str(str(w.js['dc:identifier']), w.getStateColor(w.js['rtc_cm:state'])) + " | " + w.js['dc:title']
+        print w.stateColorize(str(w.js['dc:identifier'])) + " | " + w.js['dc:title']
 
 def workitem_details(client, workitemid):
     wi = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title}')
     print
     print "=================================================================="
-    print "Workitem ID : " +colorize_str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
-    print "Title       : " +colorize_str(wi.js['dc:title'], cl.fg.red)
+    print "Workitem ID : " +cl.str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
+    print "Title       : " +cl.str(wi.js['dc:title'], cl.fg.red)
     print "URL         : " +wi.js['rdf:resource']
-    print "State       : " +colorize_str(wi.js['rtc_cm:state']['dc:title'], wi.getStateColor({ u'rdf:resource': wi.js['rtc_cm:state']['rdf:resource']}))
+    print "State       : " +wi.stateColorize(wi.js['rtc_cm:state']['dc:title'])
     print "Creator     : " +wi.js['dc:creator']['dc:title']
     print "Owner       : " +wi.js['rtc_cm:ownedBy']['dc:title']
     print "Description :"
@@ -350,7 +357,7 @@ def workitem_details(client, workitemid):
     print "Comments :"
     i = 0
     for c in comments:
-        print str(i) + ": " +colorize_str(c['dc:creator']['dc:title'], cl.fg.green)+" ("+c['dc:created'] + ") :"
+        print str(i) + ": " +cl.str(c['dc:creator']['dc:title'], cl.fg.green)+" ("+c['dc:created'] + ") :"
         print html2text.html2text(c['dc:description'])
         i = i + 1
 
@@ -402,7 +409,6 @@ default =
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'))
-    parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
     parser.add_argument("-s", "--search", help="search pattern", action="store_true")
     parser.add_argument("-c", "--comment", help="additionnal comment")
     parser.add_argument("-e", "--edit", help="edit some field of a workitem", action="store_true")
@@ -410,6 +416,7 @@ default =
     parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
     parser.add_argument("-d", "--desc", help="description of the new workitem", default='')
     parser.add_argument("-u", "--user", help="search users for this pattern")
+    parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
     parser.add_argument("--findquery", help="search queries for this pattern")
     parser.add_argument("-q", "--query", help="run query matching this pattern")
     parser.add_argument("--startworking", help="Change state of workitem to : In Progress", action="store_true")
@@ -431,7 +438,7 @@ default =
         sys.exit(1)
 
     if args.nocolor:
-        cl.colorize = 0
+        cl.colorize = False
 
     if args.search:
         for s in args.params:
