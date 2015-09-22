@@ -440,19 +440,19 @@ default =
             workitem_edit(client, s)
     elif args.startworking:
         for s in args.params:
-            Workitem(client, s).startWorking()
+            Workitem.getOne(client, s).startWorking()
     elif args.stopworking:
         for s in args.params:
-            Workitem(client, s).stopWorking()
+            Workitem.getOne(client, s).stopWorking()
     elif args.reopen:
         for s in args.params:
-            r = Workitem(client, s).reopen()
+            Workitem.getOne(client, s).reopen()
     elif args.invalidate:
         for s in args.params:
-            Workitem(client, s).invalidate()
+            Workitem.getOne(client, s).invalidate()
     elif args.resolve:
         for s in args.params:
-            Workitem(client, s).resolve()
+            Workitem.getOne(client, s).resolve()
     elif args.new:
         workitem_create(client, args.new, args.desc)
     elif args.comment:
