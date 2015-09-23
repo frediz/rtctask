@@ -305,7 +305,7 @@ def print_users(client, pattern):
         print u['dc:modified'] + " | " + cl.str(u['dc:title'].ljust(32), cl.fg.green) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
 
 
-def workitem_fromquery(client, query_str, isname = True, longdisplay = False):
+def workitem_fromquery(client, query_str, isname = True, longdisplay = False, maxtitlelen = 80):
     fields = 'oslc_cm.properties=dc:creator{dc:title},dc:type,rtc_cm:state,dc:identifier,dc:title,dc:modified,rtc_cm:ownedBy{dc:title}'
     if isname:
         query = query_search(client, query_str)['oslc_cm:results'][0]
@@ -318,6 +318,8 @@ def workitem_fromquery(client, query_str, isname = True, longdisplay = False):
         print
         print "Workitems for query : "+cl.str(query_str, cl.fg.blue)
     maxlentitle = max([len(w.js['dc:title']) for w in workitems])
+    if maxlentitle > maxtitlelen:
+        maxlentitle = maxtitlelen
     legend = "  ID  | "+"Title".ljust(maxlentitle, ' ') +" | Modified"
     if longdisplay:
         maxlencreator = max([len(w.js['dc:creator']['dc:title']) for w in workitems])
@@ -329,7 +331,7 @@ def workitem_fromquery(client, query_str, isname = True, longdisplay = False):
         separator = separator + "======" + "".ljust(maxlencreator+maxlenowner, '=')
     print separator
     for w in workitems:
-        line = w.stateColorize(str(w.js['dc:identifier'])) +" | "+w.js['dc:title'].ljust(maxlentitle,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
+        line = w.stateColorize(str(w.js['dc:identifier'])) +" | "+w.js['dc:title'].ljust(maxlentitle,' ')[:maxtitlelen]+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
         if longdisplay:
             line = line + " | " + w.js['dc:creator']['dc:title'].ljust(maxlencreator,' ') + " | " + w.js['rtc_cm:ownedBy']['dc:title'].ljust(maxlenowner,' ')
         print line
@@ -421,6 +423,8 @@ id =
 password =
 [query]
 default =
+[display]
+maxtitlelen =
 """
         with open(conffile, "w") as f:
             f.write (sample)
@@ -462,12 +466,16 @@ default =
         print "Please provide id on command line with --id or in  "+conffile
         sys.exit(1)
 
+    maxtitlelen = int(conf.get('display', 'maxtitlelen'))
+    if not maxtitlelen:
+        maxtitlelen = 80
+
     if args.nocolor:
         cl.colorize = False
 
     if args.search:
         for s in args.params:
-            workitem_fromquery(client, 'oslc_cm:searchTerms="'+s+'"', False, args.long)
+            workitem_fromquery(client, 'oslc_cm:searchTerms="'+s+'"', False, args.long, maxtitlelen)
     elif args.orphan:
         for s in args.params:
             workitem_set_parent(client, s, None)
@@ -477,7 +485,7 @@ default =
     elif args.findquery:
         print_queries(client, args.findquery)
     elif args.query:
-            workitem_fromquery(client, args.query, True, args.long)
+            workitem_fromquery(client, args.query, True, args.long, maxtitlelen)
     elif args.user:
         print_users(client, args.user)
     elif args.owner:
@@ -509,9 +517,9 @@ default =
     elif len(args.params) == 0:
         query = conf.get('query', 'default')
         if query:
-            workitem_fromquery(client, query, True, args.long)
+            workitem_fromquery(client, query, True, args.long, maxtitlelen)
         else:
-            workitem_fromquery(client, 'rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state', False, args.long)
+            workitem_fromquery(client, 'rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state', False, args.long, maxtitlelen)
     else: # there are some parameters provided without options
         for s in args.params:
             workitem_details(client, s)
