@@ -340,7 +340,11 @@ def workitem_bytag(client, tag):
         print w.stateColorize(str(w.js['dc:identifier'])) + " | " + w.js['dc:title']
 
 def workitem_details(client, workitemid):
-    wi = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title}')
+    wi = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,\
+        dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},\
+        rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title},\
+        rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent{dc:identifier,dc:title},\
+        rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children')
     print
     print "=================================================================="
     print "Workitem ID : " +cl.str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
@@ -349,6 +353,11 @@ def workitem_details(client, workitemid):
     print "State       : " +wi.stateColorize(wi.js['rtc_cm:state']['dc:title'])
     print "Creator     : " +wi.js['dc:creator']['dc:title']
     print "Owner       : " +wi.js['rtc_cm:ownedBy']['dc:title']
+    if len(wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent']) != 0:
+        par = wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent'][0]
+        print "Parent      : " + str(par['dc:identifier'])+" ("+par['dc:title']+")"
+    if len(wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children']) != 0:
+        print "Child(ren)  : " + reduce((lambda a, b: a +", "+ b), map((lambda a: re.sub(r'([^:]+): (.*)', r'\1 (\2)', a['oslc_cm:label'])), wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children']))
     print "Description :"
     print html2text.html2text(wi.js['dc:description'])
     comments = wi.get_comments()
@@ -382,8 +391,11 @@ def workitem_edit(client, workitemid):
 
 def workitem_set_parent(client, workitemid, parentid):
     workitem = Workitem.getOne(client, workitemid)
-    parent = Workitem.getOne(client, parentid)
-    js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [{ 'rdf:resource': parent.js['rdf:resource']}] }
+    if parentid is None:
+        js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [] }
+    else:
+        parent = Workitem.getOne(client, parentid)
+        js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [{ 'rdf:resource': parent.js['rdf:resource']}] }
     return workitem.change(js)
 
 def workitem_set_owner(client, workitemid, owner):
@@ -421,6 +433,7 @@ default =
     parser.add_argument("-n", "--new", help="title of the new workitem")
     parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
     parser.add_argument("-p", "--parent", help="set option parameter to parent of the argument given")
+    parser.add_argument("--orphan", help="remove the parent of the workitem", action="store_true")
     parser.add_argument("-d", "--desc", help="description of the new workitem", default='')
     parser.add_argument("-u", "--user", help="search users for this pattern")
     parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
@@ -450,6 +463,9 @@ default =
     if args.search:
         for s in args.params:
             workitem_search(client, s)
+    elif args.orphan:
+        for s in args.params:
+            workitem_set_parent(client, s, None)
     elif args.parent:
         for s in args.params:
             workitem_set_parent(client, s, args.parent)
