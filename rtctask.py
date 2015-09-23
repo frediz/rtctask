@@ -380,6 +380,12 @@ def workitem_edit(client, workitemid):
         js = json.loads(buf)
     return workitem.change(js)
 
+def workitem_set_parent(client, workitemid, parentid):
+    workitem = Workitem.getOne(client, workitemid)
+    parent = Workitem.getOne(client, parentid)
+    js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [{ 'rdf:resource': parent.js['rdf:resource']}] }
+    return workitem.change(js)
+
 def workitem_set_owner(client, workitemid, owner):
     workitem = Workitem.getOne(client, workitemid)
     users = user_search(client, owner)
@@ -414,6 +420,7 @@ default =
     parser.add_argument("-e", "--edit", help="edit some field of a workitem", action="store_true")
     parser.add_argument("-n", "--new", help="title of the new workitem")
     parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
+    parser.add_argument("-p", "--parent", help="set option parameter to parent of the argument given")
     parser.add_argument("-d", "--desc", help="description of the new workitem", default='')
     parser.add_argument("-u", "--user", help="search users for this pattern")
     parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
@@ -443,6 +450,9 @@ default =
     if args.search:
         for s in args.params:
             workitem_search(client, s)
+    elif args.parent:
+        for s in args.params:
+            workitem_set_parent(client, s, args.parent)
     elif args.findquery:
         print_queries(client, args.findquery)
     elif args.query:
