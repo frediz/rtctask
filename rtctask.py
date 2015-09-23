@@ -305,30 +305,34 @@ def print_users(client, pattern):
         print u['dc:modified'] + " | " + cl.str(u['dc:title'].ljust(32), cl.fg.green) +" | "+re.sub(r'mailto:([^%]+)%40(.*)',r'\1@\2',u['rtc_cm:emailAddress'])
 
 
-def workitem_fromquery(client, pattern):
-    query = re.sub(r'.*/([^/]+)',r'\1',query_search(client, pattern)['oslc_cm:results'][0]['rdf:resource'])
-    workitems = Workitem.getList(client, 'oslc/queries/'+query+'/rtc_cm:results.json')
-    maxlen = max([len(w.js['dc:title']) for w in workitems])
-    print "  ID  | "+"Title".ljust(maxlen, ' ') +" | Modified"
-    print "========"+"".ljust(maxlen, '=')+"======================"
+def workitem_fromquery(client, query_str, isname = True, longdisplay = False):
+    fields = 'oslc_cm.properties=dc:creator{dc:title},dc:type,rtc_cm:state,dc:identifier,dc:title,dc:modified,rtc_cm:ownedBy{dc:title}'
+    if isname:
+        query = query_search(client, query_str)['oslc_cm:results'][0]
+        queryid = re.sub(r'.*/([^/]+)',r'\1',query['rdf:resource'])
+        workitems = Workitem.getList(client, 'oslc/queries/'+queryid+'/rtc_cm:results.json?'+fields)
+        print
+        print "Workitems for query : "+cl.str(query['dc:title'], cl.fg.blue)
+    else:
+        workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query='+query_str+'&'+fields)
+        print
+        print "Workitems for query : "+cl.str(query_str, cl.fg.blue)
+    maxlentitle = max([len(w.js['dc:title']) for w in workitems])
+    legend = "  ID  | "+"Title".ljust(maxlentitle, ' ') +" | Modified"
+    if longdisplay:
+        maxlencreator = max([len(w.js['dc:creator']['dc:title']) for w in workitems])
+        maxlenowner = max([len(w.js['rtc_cm:ownedBy']['dc:title']) for w in workitems])
+        legend = legend + "            | "+"Creator".ljust(maxlencreator, ' ')+" | "+"Owner".ljust(maxlenowner, ' ')
+    print legend
+    separator = "========"+"".ljust(maxlentitle, '=')+"======================"
+    if longdisplay:
+        separator = separator + "======" + "".ljust(maxlencreator+maxlenowner, '=')
+    print separator
     for w in workitems:
-        print w.stateColorize(str(w.js['dc:identifier'])) +" | "+w.js['dc:title'].ljust(maxlen,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
-
-def workitem_ownedbyme(client):
-    workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state')
-    print "  ID  | Title"
-    print "=================================================================="
-    for w in workitems:
-        print w.stateColorize(str(w.js['dc:identifier'])) + " | " + w.js['dc:title']
-
-def workitem_search(client, pattern):
-    workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+pattern+'"')
-    print
-    print "Workitems matching : "+cl.str(pattern, cl.fg.blue)
-    print "  ID  | Title"
-    print "=================================================================="
-    for w in workitems:
-        print w.stateColorize(str(w.js['dc:identifier'])) + " | " + w.js['dc:title']
+        line = w.stateColorize(str(w.js['dc:identifier'])) +" | "+w.js['dc:title'].ljust(maxlentitle,' ')+ " | "+re.sub(r'([^T]+)T([^\.]+).*',r'\1 \2',w.js['dc:modified'])
+        if longdisplay:
+            line = line + " | " + w.js['dc:creator']['dc:title'].ljust(maxlencreator,' ') + " | " + w.js['rtc_cm:ownedBy']['dc:title'].ljust(maxlenowner,' ')
+        print line
 
 def workitem_bytag(client, tag):
     workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query=oslc_cm:searchTerms="'+tag+'"')
@@ -430,6 +434,7 @@ default =
     parser.add_argument("-s", "--search", help="search pattern", action="store_true")
     parser.add_argument("-c", "--comment", help="additionnal comment")
     parser.add_argument("-e", "--edit", help="edit some field of a workitem", action="store_true")
+    parser.add_argument("-l", "--long", help="activate long display for workitem queries and search", action="store_true")
     parser.add_argument("-n", "--new", help="title of the new workitem")
     parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
     parser.add_argument("-p", "--parent", help="set option parameter to parent of the argument given")
@@ -462,7 +467,7 @@ default =
 
     if args.search:
         for s in args.params:
-            workitem_search(client, s)
+            workitem_fromquery(client, 'oslc_cm:searchTerms="'+s+'"', False, args.long)
     elif args.orphan:
         for s in args.params:
             workitem_set_parent(client, s, None)
@@ -472,7 +477,7 @@ default =
     elif args.findquery:
         print_queries(client, args.findquery)
     elif args.query:
-        workitem_fromquery(client, args.query)
+            workitem_fromquery(client, args.query, True, args.long)
     elif args.user:
         print_users(client, args.user)
     elif args.owner:
@@ -504,9 +509,9 @@ default =
     elif len(args.params) == 0:
         query = conf.get('query', 'default')
         if query:
-            workitem_fromquery(client, query)
+            workitem_fromquery(client, query, True, args.long)
         else:
-            workitem_ownedbyme(client)
+            workitem_fromquery(client, 'rtc_cm:ownedBy="{currentUser}" /sort=rtc_cm:state', False, args.long)
     else: # there are some parameters provided without options
         for s in args.params:
             workitem_details(client, s)
