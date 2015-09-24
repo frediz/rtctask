@@ -351,7 +351,8 @@ def workitem_details(client, workitemid):
         dc:type{dc:title},dc:title,rdf:resource,dc:creator{dc:title},\
         rtc_cm:ownedBy{dc:title},dc:description,rtc_cm:state{dc:title},\
         rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent{dc:identifier,dc:title},\
-        rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children')
+        rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children,\
+        rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related')
     print
     print "=================================================================="
     print "Workitem ID : " +cl.str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
@@ -365,6 +366,8 @@ def workitem_details(client, workitemid):
         print "Parent      : " + str(par['dc:identifier'])+" ("+par['dc:title']+")"
     if len(wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children']) != 0:
         print "Child(ren)  : " + reduce((lambda a, b: a +", "+ b), map((lambda a: re.sub(r'([^:]+): (.*)', r'\1 (\2)', a['oslc_cm:label'])), wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children']))
+    if len(wi.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related']) != 0:
+        print "Related     : " + reduce((lambda a, b: a +", "+ b), map((lambda a: re.sub(r'([^:]+): (.*)', r'\1 (\2)', a['oslc_cm:label'])), wi.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related']))
     print "Description :"
     print html2text.html2text(wi.js['dc:description'])
     comments = wi.get_comments()
