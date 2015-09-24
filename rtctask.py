@@ -7,6 +7,7 @@ import json
 import pprint
 import re
 import os, sys
+import select
 import html2text
 import getpass
 import argparse
@@ -149,7 +150,7 @@ class Workitem(object):
         return json.loads(r.text)
 
     def add_comment(self, comment):
-        return self.jclient.spost('oslc/workitems/'+ str(self.workitemid) +'/rtc_cm:comments', json={'dc:description':comment}, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'});
+        return self.jclient.spost('oslc/workitems/'+ str(self.workitemid) +'/rtc_cm:comments', json={'dc:description':comment}, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'})
 
     def change(self, js):
         return self.jclient.spatch('oslc/workitems/'+ str(self.workitemid), json=js, headers={'Content-Type': 'application/x-oslc-cm-change-request+json', 'Accept': 'text/json'});
@@ -512,8 +513,16 @@ maxtitlelen =
     elif args.new:
         workitem_create(client, args.new, args.desc)
     elif args.comment:
+        if select.select([sys.stdin,],[],[],0.0)[0]:
+            comment = ""
+            for line in sys.stdin:
+                comment += line
+            comment = comment.strip()
+            workitem_comment(client, args.comment, comment)
+        else:
+            comment = args.comment
         for s in args.params:
-            workitem_comment(client, s, args.comment)
+            workitem_comment(client, s, comment)
     elif len(args.params) == 0:
         query = conf.get('query', 'default')
         if query:
