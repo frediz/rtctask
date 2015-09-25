@@ -408,6 +408,24 @@ def workitem_set_parent(client, workitemid, parentid):
         js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [{ 'rdf:resource': parent.js['rdf:resource']}] }
     return workitem.change(js)
 
+def workitem_add_related(client, workitemid, relatedid):
+    workitem = Workitem.getOne(client, workitemid)
+    related = Workitem.getOne(client, relatedid)
+    js = { 'rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related': [{ 'rdf:resource': related.js['rdf:resource'], 'oslc_cm:label': str(relatedid)+': '+related.js['dc:title']}] }
+    for e in workitem.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related']:
+        js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'].append(e)
+    return workitem.change(js)
+
+def workitem_remove_related(client, workitemid, relatedid):
+    workitem = Workitem.getOne(client, workitemid)
+    related = Workitem.getOne(client, relatedid)
+    js = { 'rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related': [] }
+    for e in workitem.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related']:
+        if e['rdf:resource'] == related.js['rdf:resource']:
+            continue
+        js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'].append({ 'rdf:resource': e['rdf:resource']})
+    return workitem.change(js)
+
 def workitem_set_owner(client, workitemid, owner):
     workitem = Workitem.getOne(client, workitemid)
     users = user_search(client, owner)
@@ -447,17 +465,19 @@ maxtitlelen =
     parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
     parser.add_argument("-p", "--parent", help="set option parameter to parent of the argument given")
     parser.add_argument("--orphan", help="remove the parent of the workitem", action="store_true")
+    parser.add_argument("--related", help="add option parameter to related of the argument given")
+    parser.add_argument("--removerelated", help="remove option parameter from related of the argument given")
     parser.add_argument("-d", "--desc", help="description of the new workitem", default='')
     parser.add_argument("-u", "--user", help="search users for this pattern")
     parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
     parser.add_argument("--findquery", help="search queries for this pattern")
     parser.add_argument("-q", "--query", help="run query matching this pattern")
-    parser.add_argument("--startworking", help="Change state of workitem to : In Progress", action="store_true")
-    parser.add_argument("--stopworking", help="Change state of workitem to : New", action="store_true")
-    parser.add_argument("--reopen", help="Change state of workitem to : In Progress", action="store_true")
-    parser.add_argument("--invalidate", help="Change state of workitem to : Invalid", action="store_true")
-    parser.add_argument("--resolve", help="Change state of workitem to : Done", action="store_true")
-    parser.add_argument("params", help="List of parameters (workitem ids, search pattern..)", nargs='*')
+    parser.add_argument("--startworking", help="change state of workitem to : In Progress", action="store_true")
+    parser.add_argument("--stopworking", help="change state of workitem to : New", action="store_true")
+    parser.add_argument("--reopen", help="change state of workitem to : In Progress", action="store_true")
+    parser.add_argument("--invalidate", help="change state of workitem to : Invalid", action="store_true")
+    parser.add_argument("--resolve", help="change state of workitem to : Done", action="store_true")
+    parser.add_argument("params", help="list of parameters (workitem ids, search pattern..)", nargs='*')
     args = parser.parse_args()
 
     if args.id:
@@ -486,6 +506,12 @@ maxtitlelen =
     elif args.parent:
         for s in args.params:
             workitem_set_parent(client, s, args.parent)
+    elif args.related:
+        for s in args.params:
+            workitem_add_related(client, s, args.related)
+    elif args.removerelated:
+        for s in args.params:
+            workitem_remove_related(client, s, args.removerelated)
     elif args.findquery:
         print_queries(client, args.findquery)
     elif args.query:
