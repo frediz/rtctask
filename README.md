@@ -1,9 +1,10 @@
-RTC Task cli client
+RTC cli client
 ===================
 
 ## Install 
 
-rtctaskpy : attempt to write a python client to RTC tasks.
+rtc.py : attempt to write a python client to RTC. At the moment, it essentially
+deals with workitems, can search through users and stored queries.
 Needs python-requests >= 2.4.0
 
 In order to install it, you should run:
@@ -13,7 +14,7 @@ $ pip install requests
 
 ## ID file
 
-Here is an example of the ~/.rtctaskrc file to start with:
+Here is an example of the ~/.rtcrc file to start with:
 
 ```
 [auth]
@@ -21,4 +22,6 @@ id = user@cc.ibm.com
 password = mypasswordincleartext
 [query]
 default =
+[display]
+maxtitlelen =
 ```

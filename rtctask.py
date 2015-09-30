@@ -433,7 +433,7 @@ def workitem_set_owner(client, workitemid, owner):
     return workitem.change(js)
 
 def main():
-    conffile = os.environ.get('HOME')+'/.rtctaskrc'
+    conffile = os.environ.get('HOME')+'/.rtcrc'
     conf = ConfigParser.RawConfigParser(allow_no_value=True)
     try:
         with open(conffile) as f:
