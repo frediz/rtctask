@@ -456,28 +456,28 @@ maxtitlelen =
     conf.read(conffile)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'))
-    parser.add_argument("-s", "--search", help="search pattern", action="store_true")
-    parser.add_argument("-c", "--comment", help="additionnal comment")
-    parser.add_argument("-e", "--edit", help="edit some field of a workitem", action="store_true")
-    parser.add_argument("-l", "--long", help="activate long display for workitem queries and search", action="store_true")
-    parser.add_argument("-n", "--new", help="title of the new workitem")
-    parser.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u")
-    parser.add_argument("-p", "--parent", help="set option parameter to parent of the argument given")
-    parser.add_argument("--orphan", help="remove the parent of the workitem", action="store_true")
-    parser.add_argument("--related", help="add option parameter to related of the argument given")
-    parser.add_argument("--removerelated", help="remove option parameter from related of the argument given")
-    parser.add_argument("-d", "--desc", help="description of the new workitem", default='')
-    parser.add_argument("-u", "--user", help="search users for this pattern")
+    group = parser.add_mutually_exclusive_group()
+    parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'), nargs=1, metavar=('<username>'))
     parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
-    parser.add_argument("--findquery", help="search queries for this pattern")
-    parser.add_argument("-q", "--query", help="run query matching this pattern")
-    parser.add_argument("--startworking", help="change state of workitem to : In Progress", action="store_true")
-    parser.add_argument("--stopworking", help="change state of workitem to : New", action="store_true")
-    parser.add_argument("--reopen", help="change state of workitem to : In Progress", action="store_true")
-    parser.add_argument("--invalidate", help="change state of workitem to : Invalid", action="store_true")
-    parser.add_argument("--resolve", help="change state of workitem to : Done", action="store_true")
-    parser.add_argument("params", help="list of parameters (workitem ids, search pattern..)", nargs='*')
+    group.add_argument("-s", "--search", help="search pattern", nargs='+', metavar=('<pattern>'))
+    group.add_argument("-c", "--comment", help="additionnal comment", nargs=1, metavar=('[<comment>] <id> [<id> ...]'))
+    group.add_argument("-e", "--edit", help="edit some fields of a workitem", nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("-l", "--long", help="activate long display for workitem queries and search", nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("-n", "--new", help="title of the new workitem", nargs=1, metavar=('<title> [<description>]'))
+    group.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u", nargs=2, metavar=('<name>', '<id> [<id> ...]'))
+    group.add_argument("-p", "--parent", help="set option parameter to parent of the argument given", nargs=2, metavar=('<parent\'s id>', '<id> [<id> ...]'))
+    group.add_argument("--orphan", help="remove the parent of the workitem", nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("--related", help="add option parameter to related of the argument given", nargs=2, metavar=('<related\'s id>', '<id> [<id> ...]'))
+    group.add_argument("--removerelated", help="remove option parameter from related of the argument given", nargs=2, metavar=('<related\'s id>', '<id> [<id> ...]'))
+    group.add_argument("-u", "--user", help="search users for this pattern", nargs=1, metavar=('<pattern>'))
+    group.add_argument("--findquery", help="search queries for this pattern", nargs=1, metavar=('<pattern>'))
+    group.add_argument("-q", "--query", help="run query matching this pattern", nargs=1, metavar=('<query\'s name>'))
+    group.add_argument("--startworking", help="change state of workitem to : In Progress",  nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("--stopworking", help="change state of workitem to : New",  nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("--reopen", help="change state of workitem to : In Progress",  nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("--invalidate", help="change state of workitem to : Invalid",  nargs=1, metavar=('<id> [<id> ...]'))
+    group.add_argument("--resolve", help="change state of workitem to : Done",  nargs=1, metavar=('<id> [<id> ...]'))
+    parser.add_argument("params", help=argparse.SUPPRESS, nargs='*', metavar=('<id>'))
     args = parser.parse_args()
 
     if args.id:
@@ -498,58 +498,84 @@ maxtitlelen =
         cl.colorize = False
 
     if args.search:
-        for s in args.params:
+        for s in args.search:
             workitem_fromquery(client, 'oslc_cm:searchTerms="'+s+'"', False, args.long, maxtitlelen)
     elif args.orphan:
-        for s in args.params:
+        args.orphan.extend(args.params)
+        for s in args.orphan:
             workitem_set_parent(client, s, None)
     elif args.parent:
+        args.params.insert(0, args.parent[1])
         for s in args.params:
-            workitem_set_parent(client, s, args.parent)
+            workitem_set_parent(client, s, args.parent[0])
     elif args.related:
+        args.params.insert(0, args.related[1])
         for s in args.params:
-            workitem_add_related(client, s, args.related)
+            workitem_add_related(client, s, args.related[0])
     elif args.removerelated:
+        args.params.insert(0, args.removerelated[1])
         for s in args.params:
-            workitem_remove_related(client, s, args.removerelated)
+            workitem_remove_related(client, s, args.removerelated[0])
     elif args.findquery:
-        print_queries(client, args.findquery)
+        if args.params:
+            parser.print_usage()
+            sys.exit(1)
+        print_queries(client, args.findquery[0])
     elif args.query:
-            workitem_fromquery(client, args.query, True, args.long, maxtitlelen)
+        if args.params:
+            parser.print_usage()
+            sys.exit(1)
+        workitem_fromquery(client, args.query[0], True, args.long, maxtitlelen)
     elif args.user:
-        print_users(client, args.user)
+        if args.params:
+            parser.print_usage()
+            sys.exit(1)
+        print_users(client, args.user[0])
     elif args.owner:
+        args.params.insert(0, args.owner[1])
         for s in args.params:
-            workitem_set_owner(client, s, args.owner)
+            workitem_set_owner(client, s, args.owner[0])
     elif args.edit:
+        args.params.insert(0, args.edit[0])
         for s in args.params:
             workitem_edit(client, s)
     elif args.startworking:
+        args.params.insert(0, args.startworking[0])
         for s in args.params:
             Workitem.getOne(client, s).startWorking()
     elif args.stopworking:
+        args.params.insert(0, args.stopworking[0])
         for s in args.params:
             Workitem.getOne(client, s).stopWorking()
     elif args.reopen:
+        args.params.insert(0, args.reopen[0])
         for s in args.params:
             Workitem.getOne(client, s).reopen()
     elif args.invalidate:
+        args.params.insert(0, args.invalidate[0])
         for s in args.params:
             Workitem.getOne(client, s).invalidate()
     elif args.resolve:
+        args.params.insert(0, args.resolve[0])
         for s in args.params:
             Workitem.getOne(client, s).resolve()
     elif args.new:
-        workitem_create(client, args.new, args.desc)
+        desc = ""
+        if args.params:
+            if len(args.params) > 1:
+                parser.print_usage()
+                sys.exit(1)
+            desc = args.params[0]
+        workitem_create(client, args.new[0], desc)
     elif args.comment:
+        comment = ""
         if select.select([sys.stdin,],[],[],0.0)[0]:
-            comment = ""
             for line in sys.stdin:
                 comment += line
             comment = comment.strip()
-            workitem_comment(client, args.comment, comment)
+            args.params.insert(0, args.comment[0])
         else:
-            comment = args.comment
+            comment = args.comment[0]
         for s in args.params:
             workitem_comment(client, s, comment)
     elif len(args.params) == 0:
