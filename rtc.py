@@ -309,7 +309,10 @@ def print_users(client, pattern):
 def workitem_fromquery(client, query_str, isname = True, longdisplay = False, maxtitlelen = 80):
     fields = 'oslc_cm.properties=dc:creator{dc:title},dc:type,rtc_cm:state,dc:identifier,dc:title,dc:modified,rtc_cm:ownedBy{dc:title}'
     if isname:
-        query = query_search(client, query_str)['oslc_cm:results'][0]
+        query = query_search(client, query_str)['oslc_cm:results']
+        if not query:
+            return
+        query = query[0]
         queryid = re.sub(r'.*/([^/]+)',r'\1',query['rdf:resource'])
         workitems = Workitem.getList(client, 'oslc/queries/'+queryid+'/rtc_cm:results.json?'+fields)
         print
@@ -318,6 +321,8 @@ def workitem_fromquery(client, query_str, isname = True, longdisplay = False, ma
         workitems = Workitem.getList(client, 'oslc/contexts/'+RTCClient.PROJECT+'/workitems.json?oslc_cm.query='+query_str+'&'+fields)
         print
         print "Workitems for query : "+cl.str(query_str, cl.fg.blue)
+    if not workitems:
+        return
     maxlentitle = max([len(w.js['dc:title']) for w in workitems])
     if maxlentitle > maxtitlelen:
         maxlentitle = maxtitlelen
@@ -412,8 +417,7 @@ def workitem_add_related(client, workitemid, relatedid):
     workitem = Workitem.getOne(client, workitemid)
     related = Workitem.getOne(client, relatedid)
     js = { 'rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related': [{ 'rdf:resource': related.js['rdf:resource'], 'oslc_cm:label': str(relatedid)+': '+related.js['dc:title']}] }
-    for e in workitem.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related']:
-        js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'].append(e)
+    js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'].extend(workitem.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'])
     return workitem.change(js)
 
 def workitem_remove_related(client, workitemid, relatedid):
