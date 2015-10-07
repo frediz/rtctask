@@ -390,7 +390,9 @@ def workitem_comment(client, workitemid, comment):
     return workitem.add_comment(comment)
 
 def workitem_create(client, title, description):
-    return Workitem.createOne(client, title, description, Task.TYPE)
+    workitem = Workitem.createOne(client, title, description, Task.TYPE)
+    print "New item created with id : " + str(workitem.js['dc:identifier'])
+    return workitem
 
 def workitem_edit(client, workitemid):
     workitem = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type,dc:title,dc:description,rtc_cm:ownedBy{dc:title}')
