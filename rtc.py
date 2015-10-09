@@ -119,7 +119,10 @@ class Workitem(object):
     @classmethod
     def getOne(cls, client, workitemid, json_query = ""):
         r = client.sget('oslc/workitems/'+ str(workitemid) +'.json'+json_query)
-        return Workitem.__createItem(client, json.loads(r.text))
+        if r.status_code != 200:
+            error("Error while checking the workitem id '%s': %s" % (workitemid, r.reason))
+        w = Workitem.__createItem(client, json.loads(r.text))
+        return w
 
     @classmethod
     def getList(cls, client, json_query = ""):
@@ -280,6 +283,9 @@ class Defect(Workitem):
         elif state == self.VERIFIED:
             return cl.fg.green
 
+def error(str):
+    print str
+    sys.exit(1)
 
 def user_search(client, pattern):
     r = client.sget('oslc/users.json?oslc_cm.query=dc:title="*'+pattern+'*"')
@@ -435,6 +441,8 @@ def workitem_remove_related(client, workitemid, relatedid):
 def workitem_set_owner(client, workitemid, owner):
     workitem = Workitem.getOne(client, workitemid)
     users = user_search(client, owner)
+    if not users['oslc_cm:results']:
+        error("Unknown user: %s" % (owner))
     js = { 'rtc_cm:ownedBy': { 'rdf:resource': users['oslc_cm:results'][0]['rdf:resource'] } }
     return workitem.change(js)
 
@@ -465,10 +473,10 @@ maxtitlelen =
     group = parser.add_mutually_exclusive_group()
     parser.add_argument("-i", "--id", help="username id for login", default=conf.get('auth', 'id'), nargs=1, metavar=('<username>'))
     parser.add_argument("--nocolor", help="turn off color in output", action="store_true")
+    parser.add_argument("-l", "--long", help="activate long display for workitem queries and search", action="store_true")
     group.add_argument("-s", "--search", help="search pattern", nargs='+', metavar=('<pattern>'))
     group.add_argument("-c", "--comment", help="additionnal comment", nargs=1, metavar=('[<comment>] <id> [<id> ...]'))
     group.add_argument("-e", "--edit", help="edit some fields of a workitem", nargs=1, metavar=('<id> [<id> ...]'))
-    group.add_argument("-l", "--long", help="activate long display for workitem queries and search", nargs=1, metavar=('<id> [<id> ...]'))
     group.add_argument("-n", "--new", help="title of the new workitem", nargs=1, metavar=('<title> [<description>]'))
     group.add_argument("-o", "--owner", help="name, firstname lastname, whatever that can match : 1st result will be used : check with -u", nargs=2, metavar=('<name>', '<id> [<id> ...]'))
     group.add_argument("-p", "--parent", help="set option parameter to parent of the argument given", nargs=2, metavar=('<parent\'s id>', '<id> [<id> ...]'))
