@@ -119,10 +119,16 @@ class Workitem(object):
     @classmethod
     def getOne(cls, client, workitemid, json_query = ""):
         r = client.sget('oslc/workitems/'+ str(workitemid) +'.json'+json_query)
-        if r.status_code != 200:
-            print "Error while checking the workitem id '%s': %s" % (workitemid, r.reason)
-            sys.exit(1)
-        return Workitem.__createItem(client, json.loads(r.text))
+        if r.status_code == 200:
+            return Workitem.__createItem(client, json.loads(r.text))
+        elif r.status_code in [ 400, 404 ]:
+            js = json.loads(r.text)
+            print "Error while getting workitem id '%s' :" % workitemid
+            print js['oslc_cm:message']
+        else:
+            print "Unknown error : %s [%s]" % (r.reason, r.status_code)
+            print r.text
+        sys.exit(1)
 
     @classmethod
     def getList(cls, client, json_query = ""):
