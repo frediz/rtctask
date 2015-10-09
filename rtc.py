@@ -119,10 +119,9 @@ class Workitem(object):
     @classmethod
     def getOne(cls, client, workitemid, json_query = ""):
         r = client.sget('oslc/workitems/'+ str(workitemid) +'.json'+json_query)
-        try:
-            w = Workitem.__createItem(client, json.loads(r.text))
-        except:
-            w = None
+        if r.status_code != 200:
+            error("Error while checking the workitem id '%s': %s" % (workitemid, r.reason))
+        w = Workitem.__createItem(client, json.loads(r.text))
         return w
 
     @classmethod
@@ -365,8 +364,6 @@ def workitem_details(client, workitemid):
         rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent{dc:identifier,dc:title},\
         rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children,\
         rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related')
-    if not wi:
-        error("Unknown id: %s" % (workitemid))
     print
     print "=================================================================="
     print "Workitem ID : " +cl.str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
@@ -396,8 +393,6 @@ def workitem_details(client, workitemid):
 
 def workitem_comment(client, workitemid, comment):
     workitem = Workitem.getOne(client, workitemid)
-    if not workitem:
-        error("Unknown id: %s" % (workitemid))
     return workitem.add_comment(comment)
 
 def workitem_create(client, title, description):
@@ -407,8 +402,6 @@ def workitem_create(client, title, description):
 
 def workitem_edit(client, workitemid):
     workitem = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,dc:type,dc:title,dc:description,rtc_cm:ownedBy{dc:title}')
-    if not workitem:
-        error("Unknown id: %s" % (workitemid))
     with tempfile.NamedTemporaryFile(suffix='workitem') as temp:
         editor = os.environ.get('EDITOR','vim')
         buf = json.dumps(workitem.js, indent = 2, separators=(',', ': '))
@@ -421,35 +414,23 @@ def workitem_edit(client, workitemid):
 
 def workitem_set_parent(client, workitemid, parentid):
     workitem = Workitem.getOne(client, workitemid)
-    if not workitem:
-        error("Unknown id: %s" % (workitemid))
     if parentid is None:
         js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [] }
     else:
         parent = Workitem.getOne(client, parentid)
-        if not parent:
-            error("Unknown id: %s" % (parentid))
         js = { 'rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent': [{ 'rdf:resource': parent.js['rdf:resource']}] }
     return workitem.change(js)
 
 def workitem_add_related(client, workitemid, relatedid):
     workitem = Workitem.getOne(client, workitemid)
-    if not workitem:
-        error("Unknown id: %s" % (workitemid))
     related = Workitem.getOne(client, relatedid)
-    if not related:
-        error("Unknown id: %s" % (relatedid))
     js = { 'rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related': [{ 'rdf:resource': related.js['rdf:resource'], 'oslc_cm:label': str(relatedid)+': '+related.js['dc:title']}] }
     js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'].extend(workitem.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related'])
     return workitem.change(js)
 
 def workitem_remove_related(client, workitemid, relatedid):
     workitem = Workitem.getOne(client, workitemid)
-    if not workitem:
-        error("Unknown id: %s" % (workitemid))
     related = Workitem.getOne(client, relatedid)
-    if not related:
-        error("Unknown id: %s" % (relatedid))
     js = { 'rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related': [] }
     for e in workitem.js['rtc_cm:com.ibm.team.workitem.linktype.relatedworkitem.related']:
         if e['rdf:resource'] == related.js['rdf:resource']:
@@ -459,8 +440,6 @@ def workitem_remove_related(client, workitemid, relatedid):
 
 def workitem_set_owner(client, workitemid, owner):
     workitem = Workitem.getOne(client, workitemid)
-    if not workitem:
-        error("Unknown id: %s" % (workitemid))
     users = user_search(client, owner)
     if not users['oslc_cm:results']:
         error("Unknown user: %s" % (owner))
@@ -577,38 +556,23 @@ maxtitlelen =
     elif args.startworking:
         args.params.insert(0, args.startworking[0])
         for s in args.params:
-            wi = Workitem.getOne(client, s)
-            if not wi:
-                error("Unknown id: %s" % (s))
-            wi.startWorking()
+            Workitem.getOne(client, s).startWorking()
     elif args.stopworking:
         args.params.insert(0, args.stopworking[0])
         for s in args.params:
-            wi = Workitem.getOne(client, s)
-            if not wi:
-                error("Unknown id: %s" % (s))
-            wi.stopWorking()
+            Workitem.getOne(client, s).stopWorking()
     elif args.reopen:
         args.params.insert(0, args.reopen[0])
         for s in args.params:
-            wi = Workitem.getOne(client, s)
-            if not wi:
-                error("Unknown id: %s" % (s))
-            wi.reopen()
+            Workitem.getOne(client, s).reopen()
     elif args.invalidate:
         args.params.insert(0, args.invalidate[0])
         for s in args.params:
-            wi = Workitem.getOne(client, s)
-            if not wi:
-                error("Unknown id: %s" % (s))
-            wi.invalidate()
+            Workitem.getOne(client, s).invalidate()
     elif args.resolve:
         args.params.insert(0, args.resolve[0])
         for s in args.params:
-            wi = Workitem.getOne(client, s)
-            if not wi:
-                error("Unknown id: %s" % (s))
-            wi.resolve()
+            Workitem.getOne(client, s).resolve()
     elif args.new:
         desc = ""
         if args.params:
