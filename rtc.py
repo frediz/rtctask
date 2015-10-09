@@ -120,9 +120,9 @@ class Workitem(object):
     def getOne(cls, client, workitemid, json_query = ""):
         r = client.sget('oslc/workitems/'+ str(workitemid) +'.json'+json_query)
         if r.status_code != 200:
-            error("Error while checking the workitem id '%s': %s" % (workitemid, r.reason))
-        w = Workitem.__createItem(client, json.loads(r.text))
-        return w
+            print "Error while checking the workitem id '%s': %s" % (workitemid, r.reason)
+            sys.exit(1)
+        return Workitem.__createItem(client, json.loads(r.text))
 
     @classmethod
     def getList(cls, client, json_query = ""):
@@ -283,10 +283,6 @@ class Defect(Workitem):
         elif state == self.VERIFIED:
             return cl.fg.green
 
-def error(str):
-    print str
-    sys.exit(1)
-
 def user_search(client, pattern):
     r = client.sget('oslc/users.json?oslc_cm.query=dc:title="*'+pattern+'*"')
     return json.loads(r.text)
@@ -442,7 +438,8 @@ def workitem_set_owner(client, workitemid, owner):
     workitem = Workitem.getOne(client, workitemid)
     users = user_search(client, owner)
     if not users['oslc_cm:results']:
-        error("Unknown user: %s" % (owner))
+        print "Unknown user: %s" % (owner)
+        sys.exit(1)
     js = { 'rtc_cm:ownedBy': { 'rdf:resource': users['oslc_cm:results'][0]['rdf:resource'] } }
     return workitem.change(js)
 
