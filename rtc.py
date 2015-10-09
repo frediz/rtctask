@@ -403,7 +403,11 @@ def workitem_edit(client, workitemid):
         buf = json.dumps(workitem.js, indent = 2, separators=(',', ': '))
         temp.write(buf)
         temp.flush()
-        subprocess.call([editor, temp.name])
+        try:
+            subprocess.call([editor, temp.name])
+        except OSError:
+            print "'%s' can not be executed" % editor
+            sys.exit(1)
         buf = open(temp.name, 'r').read()
         js = json.loads(buf)
     return workitem.change(js)
