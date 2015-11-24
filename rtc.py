@@ -381,7 +381,7 @@ def workitem_details(client, workitemid):
     print
     print "=================================================================="
     print "Workitem ID : " +cl.str(str(wi.js['dc:identifier']), cl.fg.green)+' ('+wi.js['dc:type']['dc:title']+')'
-    print "Title       : " +cl.str(wi.js['dc:title'], cl.fg.red)
+    print "Title       : " +cl.str(wi.js['dc:title'].strip(), cl.fg.red)
     print "URL         : " +wi.js['rdf:resource']
     print "State       : " +wi.stateColorize(wi.js['rtc_cm:state']['dc:title'])
     print "Creator     : " +wi.js['dc:creator']['dc:title']
@@ -404,6 +404,28 @@ def workitem_details(client, workitemid):
         print str(i) + ": " +cl.str(c['dc:creator']['dc:title'], cl.fg.green)+" ("+c['dc:created'] + ") :"
         print html2text.html2text(c['dc:description'])
         i = i + 1
+
+def workitem_tree(client, workitemid, parents = [], offset = "", last = True):
+    wi = Workitem.getOne(client, workitemid, '?oslc_cm.properties=dc:identifier,\
+        dc:type{dc:title},dc:title,rdf:resource,rtc_cm:state{dc:title},\
+        rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children')
+    prefix = offset + " \_"
+    if len(parents) == 0:
+        prefix = ""
+    print prefix + wi.stateColorize(str(wi.js['dc:identifier'])) + " [" + wi.js['dc:type']['dc:title'] + "] " + wi.js['dc:title'].strip()
+    if workitemid in parents:
+        return
+    parents = parents + [ workitemid ]
+    n = len(wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children'])
+    if prefix != "":
+        if last and n > 0:
+            prefix = offset + "   "
+        else:
+            prefix = offset + " | "
+    i = 1
+    for c in wi.js['rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children']:
+        workitem_tree(client, re.sub(r'.*/([^/]+)', r'\1', c['rdf:resource']), parents, prefix, i == n)
+        i+=1
 
 def workitem_comment(client, workitemid, comment):
     workitem = Workitem.getOne(client, workitemid)
@@ -505,6 +527,7 @@ maxtitlelen =
     group.add_argument("-u", "--user", help="search users for this pattern", nargs=1, metavar=('<pattern>'))
     group.add_argument("--findquery", help="search queries for this pattern", nargs=1, metavar=('<pattern>'))
     group.add_argument("-q", "--query", help="run query matching this pattern", nargs=1, metavar=('<query\'s name>'))
+    group.add_argument("--tree", help="display a tree", nargs=1, metavar=('<id> [<id> ...]'))
     group.add_argument("--startworking", help="change state of workitem to : In Progress",  nargs=1, metavar=('<id> [<id> ...]'))
     group.add_argument("--stopworking", help="change state of workitem to : New",  nargs=1, metavar=('<id> [<id> ...]'))
     group.add_argument("--reopen", help="change state of workitem to : In Progress",  nargs=1, metavar=('<id> [<id> ...]'))
@@ -559,6 +582,10 @@ maxtitlelen =
             parser.print_usage()
             sys.exit(1)
         workitem_fromquery(client, args.query[0], True, args.long, maxtitlelen)
+    elif args.tree:
+        workitem_tree(client, args.tree[0])
+        for s in args.params:
+            workitem_tree(client, s)
     elif args.user:
         if args.params:
             parser.print_usage()
