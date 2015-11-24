@@ -244,7 +244,6 @@ class Story(Workitem):
         elif state == self.DEFERRED:
             return cl.fg.yellow
 
-
 class Epic(Workitem):
     TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.apt.workItemType.epic'
 
@@ -288,6 +287,19 @@ class Defect(Workitem):
             return cl.fg.lightred
         elif state == self.VERIFIED:
             return cl.fg.green
+
+class Risk(Workitem):
+    TYPE = RTCClient.HOST+'oslc/types/'+RTCClient.PROJECT+'/com.ibm.team.workitem.workItemType.risk'
+
+    NEW = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/riskWorkflow/riskWorkflow.state.s1'
+    TOBEVALIDATED = RTCClient.HOST+'oslc/workflows/'+RTCClient.PROJECT+'/states/riskWorkflow/riskWorkflow.state.s2'
+
+    def getStateColor(self):
+        state = self.js['rtc_cm:state']['rdf:resource']
+        if state == self.NEW:
+            return cl.fg.purple
+        elif state == self.TOBEVALIDATED:
+            return cl.fg.lightred
 
 def user_search(client, pattern):
     r = client.sget('oslc/users.json?oslc_cm.query=dc:title="*'+pattern+'*"')
